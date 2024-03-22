@@ -22,7 +22,7 @@ window.onresize = () => {
 window.onresize()
 
 //define the levels
-const levels = [
+let levels = [
     [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -442,7 +442,7 @@ document.addEventListener('keydown', event => {
 document.addEventListener('keypress', event => {
     if (event.key == '`') {
         if (levelIndex + 1 < levels.length)
-            loadLevel(levels[levelIndex++ + 1],true)
+            loadLevel(levels[levelIndex++ + 1], true)
         else {
             alert('You won!')
             player = undefined
@@ -455,6 +455,65 @@ document.addEventListener('keypress', event => {
         loadLevel(levels[0])
     }
     if (event.key == 'f') showFullLevel = !showFullLevel
+    if (event.key == 'c') {
+        if (localStorage.getItem('levels') && JSON.parse(localStorage.getItem('levels')).length > 0) {
+            levels = JSON.parse(localStorage.getItem('levels')).sort(() => Math.random() * 2 - 1)
+            levelIndex = 0
+            loadLevel(levels[0])
+            alert('Now playing custom levels, shuffled')
+        } else
+            alert('You have no custom levels')
+    }
+    if (event.key == 'i') {
+        isCameraRunningCutscene = true
+        let div = document.createElement('div')
+        div.id = 'inputDiv'
+        div.innerHTML = `
+            <button id='submit'>Submit</button>
+            <textarea id='textarea'></textarea>
+        `
+        document.body.appendChild(div)
+        document.getElementById('submit').addEventListener('click', event => {
+            let valid = true
+            let input
+            try {
+                input = JSON.parse(document.getElementById('textarea').value)
+                const width = input[0].length
+                for (let y = 0; y < input.length; y++) {
+                    if (input[y].length != width) valid = false
+                    for (let x = 0; x < width; x++)
+                        if (!([0, 1, 2, 3, 4].includes(input[y][x]))) valid = false
+                }
+            } catch { valid = false }
+            if (valid) {
+                if (localStorage.getItem('levels') != undefined)
+                    localStorage.setItem('levels', JSON.stringify([...JSON.parse(localStorage.getItem('levels') ?? []), input]))
+                else
+                    localStorage.setItem('levels', JSON.stringify([input]))
+                console.log(input)
+                alert('added to storage')
+            } else alert('invalid level')
+            div.remove()
+            isCameraRunningCutscene = false
+        })
+    }
+    if (event.key == 'p' && window.confirm('Are you sure you want to clear all custom levels?')) localStorage.clear()
+    if (event.key == 'o') {
+        (async () => {
+            try {
+                // Write the text to the clipboard
+                await navigator.clipboard.writeText((localStorage.getItem('levels')))
+
+                // Alert or log success message
+                alert("Custom levels copied to clipboard")
+            } catch (error) {
+                // Handle errors
+                console.error("Failed to copy text: ", error)
+                alert("Failed to copy text: " + error.message)
+            }
+        })()
+        console.log(JSON.parse(localStorage.getItem('levels')))
+    }
 })
 
 // Run the engine
