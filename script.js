@@ -402,6 +402,11 @@ document.addEventListener('keypress', event => {
             location.reload()
         }
     }
+    if (event.key == 'r') loadLevel(levels[levelIndex])
+    if (event.key == 'R') {
+        levelIndex = 0
+        loadLevel(levels[0])
+    }
 })
 
 // Run the engine
