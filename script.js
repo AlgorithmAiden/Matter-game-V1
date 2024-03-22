@@ -198,13 +198,12 @@ const levels = [
 
 //choose the colors for everything
 const colorKey = {
-    0: '#000',
     1: '#333',
     2: '#0f0',
     3: '#00f',
     4: '#f00',
     sensor: false ? '#00f6' : '#0000',
-    background: '#151515'
+    background: '#151515',
 }
 
 /**level block key
@@ -214,6 +213,16 @@ const colorKey = {
  * 3: end
  * 4: death
  */
+
+//camera settings
+let showFullLevel = false
+let camera = {
+    x: 0,
+    y: 0,
+    scale: 0,
+}
+const targetCameraScale = 25
+let isCameraRunningCutscene = false
 
 //keep track of which level is current
 let levelIndex = 0
@@ -226,9 +235,9 @@ const floorSensorSize = .1
 
 //some player parms
 const playerBlockSize = .75
-const jumpStrength = .05
-const airSideStrength = .001
-const floorSlideStrength = .005
+const jumpStrength = 10
+const airSideStrength = .0005
+const floorSlideStrength = .0025
 
 const coyoteTime = 250 //a quarter second of time you can jump after you go off a ledge
 
@@ -244,7 +253,10 @@ let floorSensors = []
 //hold the bad blocks
 let deathBlocks = []
 
-const loadLevel = (level) => {
+
+let width, height
+
+const loadLevel = (level, first) => {
     //clear the old world
     Matter.World.clear(engine.world)
     Matter.Engine.clear(engine)
@@ -255,20 +267,30 @@ const loadLevel = (level) => {
     floorSensors = []
     deathBlocks = []
 
-    //set the renders size to fit the lever
-    const width = level[0].length * blockSize
-    const height = level.length * blockSize
+    //set the renders size to fit the level
+    width = level[0].length * blockSize
+    height = level.length * blockSize
 
-    Matter.Render.lookAt(render, {
-        min: { x: 0, y: 0 },
-        max: { x: width, y: height }
-    });
+    if (first) {
+        //run a camera animation
+        isCameraRunningCutscene = true
+        camera.scale = 0
+        camera.x = width / 2
+        camera.y = height / 2
+        const part1Handle = setInterval(() => {
+            camera.scale = camera.scale + (Math.max(width / blockSize, height / blockSize) - camera.scale) / 35
+        }, 1000 / 100)
+        setTimeout(() => {
+            clearInterval(part1Handle)
+            isCameraRunningCutscene = false
+        }, 2000)
+    }
 
     //create the walls for the level
-    Matter.World.add(world, Matter.Bodies.rectangle(width / 2, -blockSize / 2, width, blockSize, { isStatic: true })) //top
-    Matter.World.add(world, Matter.Bodies.rectangle(width / 2, height + blockSize / 2, width, blockSize, { isStatic: true })) //bottom
-    Matter.World.add(world, Matter.Bodies.rectangle(-blockSize / 2, height / 2, blockSize, height, { isStatic: true })) //left
-    Matter.World.add(world, Matter.Bodies.rectangle(width + blockSize / 2, height / 2, blockSize, height, { isStatic: true })) //right
+    Matter.World.add(world, Matter.Bodies.rectangle(width / 2, -blockSize / 2, width, blockSize, { isStatic: true, render: { fillStyle: colorKey[1] } })) //top
+    Matter.World.add(world, Matter.Bodies.rectangle(width / 2, height + blockSize / 2, width, blockSize, { isStatic: true, render: { fillStyle: colorKey[1] } })) //bottom
+    Matter.World.add(world, Matter.Bodies.rectangle(-blockSize / 2, height / 2, blockSize, height, { isStatic: true, render: { fillStyle: colorKey[1] } })) //left
+    Matter.World.add(world, Matter.Bodies.rectangle(width + blockSize / 2, height / 2, blockSize, height, { isStatic: true, render: { fillStyle: colorKey[1] } })) //right
 
     //and the floor sensor
     let sensor = Matter.Bodies.rectangle(
@@ -345,18 +367,42 @@ const loadLevel = (level) => {
 
 }
 
-loadLevel(levels[levelIndex])
+loadLevel(levels[levelIndex], true)
 
 
 let keys = []
 let lastOnFloor = 0
 setInterval(() => {
-    if (player) {
+
+    //move the camera as needed
+    if (!isCameraRunningCutscene) {
+        if (showFullLevel) {
+            camera.scale = camera.scale + (Math.max(width / blockSize, height / blockSize) - camera.scale) / 25
+            camera.x += (width / 2 - camera.x) / 25
+            camera.y += (height / 2 - camera.y) / 25
+        } else {
+            camera.scale = camera.scale + (targetCameraScale - camera.scale) / 25
+            camera.x += (player.position.x - camera.x) / 25
+            camera.y += (player.position.y - camera.y) / 25
+        }
+    }
+    Matter.Render.lookAt(render, {
+        min: {
+            x: camera.x - camera.scale * blockSize / 2,
+            y: camera.y - camera.scale * blockSize / 2
+        },
+        max: {
+            x: camera.x - camera.scale * blockSize / 2 + camera.scale * blockSize,
+            y: camera.y - camera.scale * blockSize / 2 + camera.scale * blockSize
+        }
+    })
+
+    if (player && !isCameraRunningCutscene) {
 
         //check for ends
         if (end && Matter.Query.collides(player, [end]).length > 0)
             if (levelIndex + 1 < levels.length)
-                loadLevel(levels[levelIndex++ + 1])
+                loadLevel(levels[levelIndex++ + 1], true)
             else {
                 alert('You won!')
                 player = undefined
@@ -371,8 +417,9 @@ setInterval(() => {
         //move the player
         const onFloor = Matter.Query.collides(player, floorSensors).length > 0 && player.velocity.y > -.1
         if (onFloor) lastOnFloor = Date.now()
+
         if (keys.includes('w') && Date.now() - lastOnFloor <= coyoteTime) {
-            Matter.Body.applyForce(player, { x: player.position.x, y: player.position.y + blockSize * playerBlockSize / 2 }, { x: 0, y: -jumpStrength })
+            Matter.Body.setVelocity(player, { x: player.velocity.x, y: -jumpStrength })
             lastOnFloor = 0
         }
         if (keys.includes('a'))
@@ -395,7 +442,7 @@ document.addEventListener('keydown', event => {
 document.addEventListener('keypress', event => {
     if (event.key == '`') {
         if (levelIndex + 1 < levels.length)
-            loadLevel(levels[levelIndex++ + 1])
+            loadLevel(levels[levelIndex++ + 1],true)
         else {
             alert('You won!')
             player = undefined
@@ -407,6 +454,7 @@ document.addEventListener('keypress', event => {
         levelIndex = 0
         loadLevel(levels[0])
     }
+    if (event.key == 'f') showFullLevel = !showFullLevel
 })
 
 // Run the engine
