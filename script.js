@@ -202,7 +202,7 @@ const colorKey = {
     2: '#0f0',
     3: '#00f',
     4: '#f00',
-    sensor: false ? '#00f6' : '#0000',
+    sensor: Math.random() < .1 ? '#00f6' : '#0000',
     background: '#151515',
 }
 
@@ -323,9 +323,14 @@ const loadLevel = (level, first) => {
                     //create the floor sensor
                     let sensor = Matter.Bodies.rectangle(
                         x * blockSize + blockSize / 2,
-                        y * blockSize + blockSize * floorSensorSize / 2,
+                        y * blockSize - blockSize * floorSensorSize,
                         blockSize, blockSize * floorSensorSize,
-                        { isStatic: true, label: 'floorSensor', render: { fillStyle: colorKey.sensor } })
+                        {
+                            isStatic: true,
+                            label: 'floorSensor',
+                            isSensor: true,
+                            render: { fillStyle: colorKey.sensor }
+                        })
                     floorSensors.push(sensor)
                     Matter.World.add(world, sensor)
                 }
